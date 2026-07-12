@@ -1,14 +1,74 @@
 import { configureChains, createConfig } from "wagmi";
-import { sepolia } from "wagmi/chains";
+import { defineChain } from "viem";
 import { jsonRpcProvider } from "wagmi/providers/jsonRpc";
 import { publicProvider } from "wagmi/providers/public";
 import { InjectedConnector } from "wagmi/connectors/injected";
 
-export const FORMULA7777_CONTRACT_ADDRESS = "0xdbaDfa0d84A5b2Bc04e0a64c70878Bdaa8a74741";
-export const TARGET_CHAIN = sepolia;
-export const CUSTOM_SEPOLIA_RPC_URL = import.meta.env.VITE_SEPOLIA_RPC_URL?.trim() || "";
-export const HAS_CUSTOM_SEPOLIA_RPC_URL = Boolean(CUSTOM_SEPOLIA_RPC_URL);
-export const DEFAULT_SEPOLIA_RPC_URL = "https://ethereum-sepolia-rpc.publicnode.com";
+export const ROBINHOOD_RPC_URL = "https://rpc.mainnet.chain.robinhood.com/";
+export const ROBINHOOD_EXPLORER_URL = "https://robinhoodchain.blockscout.com";
+export const ROBINHOOD_TESTNET_RPC_URL = "https://rpc.testnet.chain.robinhood.com/";
+export const ROBINHOOD_TESTNET_EXPLORER_URL = "https://explorer.testnet.chain.robinhood.com";
+
+export const robinhoodChain = defineChain({
+  id: 4663,
+  name: "Robinhood Chain",
+  network: "robinhood-chain",
+  nativeCurrency: {
+    name: "Ether",
+    symbol: "ETH",
+    decimals: 18,
+  },
+  rpcUrls: {
+    default: { http: [ROBINHOOD_RPC_URL] },
+    public: { http: [ROBINHOOD_RPC_URL] },
+  },
+  blockExplorers: {
+    default: {
+      name: "Robinhood Chain Blockscout",
+      url: ROBINHOOD_EXPLORER_URL,
+    },
+  },
+});
+
+export const robinhoodTestnetChain = defineChain({
+  id: 46630,
+  name: "Robinhood Chain Testnet",
+  network: "robinhood-chain-testnet",
+  nativeCurrency: {
+    name: "Ether",
+    symbol: "ETH",
+    decimals: 18,
+  },
+  rpcUrls: {
+    default: { http: [ROBINHOOD_TESTNET_RPC_URL] },
+    public: { http: [ROBINHOOD_TESTNET_RPC_URL] },
+  },
+  blockExplorers: {
+    default: {
+      name: "Robinhood Chain Testnet Explorer",
+      url: ROBINHOOD_TESTNET_EXPLORER_URL,
+    },
+  },
+  testnet: true,
+});
+
+export const ROBINHOOD_CONTRACT_ADDRESS_PLACEHOLDER = "0x0000000000000000000000000000000000000000";
+export const IS_ROBINHOOD_TESTNET = import.meta.env.VITE_NETWORK?.trim() === "robinhood-testnet";
+export const FORMULA7777_CONTRACT_ADDRESS =
+  (IS_ROBINHOOD_TESTNET
+    ? import.meta.env.VITE_ROBINHOOD_TESTNET_CONTRACT_ADDRESS?.trim()
+    : import.meta.env.VITE_ROBINHOOD_CONTRACT_ADDRESS?.trim()) || ROBINHOOD_CONTRACT_ADDRESS_PLACEHOLDER;
+export const HAS_ROBINHOOD_DEPLOYMENT =
+  FORMULA7777_CONTRACT_ADDRESS !== ROBINHOOD_CONTRACT_ADDRESS_PLACEHOLDER;
+export const TARGET_CHAIN = IS_ROBINHOOD_TESTNET ? robinhoodTestnetChain : robinhoodChain;
+export const CUSTOM_ROBINHOOD_RPC_URL =
+  (IS_ROBINHOOD_TESTNET
+    ? import.meta.env.VITE_ROBINHOOD_TESTNET_RPC_URL?.trim()
+    : import.meta.env.VITE_ROBINHOOD_RPC_URL?.trim()) || "";
+export const HAS_CUSTOM_ROBINHOOD_RPC_URL = Boolean(CUSTOM_ROBINHOOD_RPC_URL);
+export const DEFAULT_ROBINHOOD_RPC_URL = IS_ROBINHOOD_TESTNET
+  ? ROBINHOOD_TESTNET_RPC_URL
+  : ROBINHOOD_RPC_URL;
 
 export const FORMULA7777_ABI = [
   {
@@ -50,11 +110,11 @@ export const FORMULA7777_ABI = [
 
 const providers = [];
 
-if (HAS_CUSTOM_SEPOLIA_RPC_URL) {
+if (HAS_CUSTOM_ROBINHOOD_RPC_URL) {
   providers.push(
     jsonRpcProvider({
       rpc: () => ({
-        http: CUSTOM_SEPOLIA_RPC_URL,
+        http: CUSTOM_ROBINHOOD_RPC_URL,
       }),
     }),
   );
@@ -63,14 +123,14 @@ if (HAS_CUSTOM_SEPOLIA_RPC_URL) {
 providers.push(
   jsonRpcProvider({
     rpc: () => ({
-      http: DEFAULT_SEPOLIA_RPC_URL,
+      http: DEFAULT_ROBINHOOD_RPC_URL,
     }),
   }),
 );
 
 providers.push(publicProvider());
 
-const { chains, publicClient, webSocketPublicClient } = configureChains([sepolia], providers);
+const { chains, publicClient, webSocketPublicClient } = configureChains([TARGET_CHAIN], providers);
 
 export const formulaConfig = createConfig({
   autoConnect: true,

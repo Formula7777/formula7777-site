@@ -7,11 +7,28 @@
   background:
     radial-gradient(circle at top, rgba(18, 50, 62, 0.28), transparent 32%),
     linear-gradient(180deg, #030405 0%, #06080d 100%);
+  background-color: #020304;
   font-family: ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+  background-color: #020304;
+}
+
+html {
+  height: 100%;
 }
 
 * {
   box-sizing: border-box;
+}
+
+img,
+svg {
+  max-width: 100%;
 }
 
 body {
@@ -23,9 +40,11 @@ body {
   background:
     radial-gradient(circle at top, rgba(17, 46, 56, 0.35), transparent 30%),
     linear-gradient(180deg, #020304 0%, #070910 100%);
+  background-color: #020304;
 }
 
 #root {
+  background-color: #020304;
   overflow-x: hidden;
 }
 
@@ -122,6 +141,27 @@ button {
   gap: 0.75rem;
   animation: preview-marquee 42s linear infinite;
   will-change: transform;
+}
+
+@media (max-width: 639px) {
+  .preview-marquee {
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    scrollbar-width: thin;
+    mask-image: none;
+    -webkit-mask-image: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .preview-marquee::before,
+  .preview-marquee::after {
+    display: none;
+  }
+
+  .preview-track {
+    animation: none;
+    padding-bottom: 0.35rem;
+  }
 }
 
 .ambient-particles,

@@ -27,12 +27,12 @@ export function CurvePreview({ mintedSupply }) {
   const markerAlignedLeft = progressX < WIDTH * 0.58;
 
   return (
-    <div className="rounded-3xl border border-line bg-panel/80 p-5 shadow-glow">
-      <div className="mb-4 flex items-center justify-between text-xs uppercase tracking-[0.2em] text-slate-400">
+    <div className="min-w-0 overflow-hidden rounded-3xl border border-line bg-panel/80 p-4 shadow-glow sm:p-5">
+      <div className="mb-4 flex flex-col gap-1 text-xs uppercase tracking-[0.16em] text-slate-400 sm:flex-row sm:items-center sm:justify-between sm:tracking-[0.2em]">
         <span>Mint Curve</span>
         <span>x = minted supply</span>
       </div>
-      <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="h-auto w-full max-w-full overflow-visible">
+      <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="block h-auto w-full max-w-full">
         <defs>
           <linearGradient id="curve-line" x1="0%" x2="100%" y1="0%" y2="0%">
             <stop offset="0%" stopColor="#75f7c3" />
