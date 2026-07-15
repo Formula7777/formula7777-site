@@ -64,6 +64,59 @@ function normalizeRpcError(error, fallbackLabel) {
   return message;
 }
 
+function getNestedErrorValue(error, key) {
+  let current = error;
+  while (current) {
+    if (current[key] !== undefined) {
+      return current[key];
+    }
+
+    current = current.cause || current.details;
+  }
+
+  return undefined;
+}
+
+function getErrorText(error, fallbackLabel) {
+  const message =
+    error?.shortMessage ||
+    error?.message ||
+    error?.details ||
+    (typeof error === "string" ? error : "") ||
+    fallbackLabel;
+
+  return String(message)
+    .replace(/^error:\s*/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isWalletRejectionError(error) {
+  const code = getNestedErrorValue(error, "code");
+  const name = getNestedErrorValue(error, "name");
+  const text = getErrorText(error, "").toLowerCase();
+
+  return (
+    code === 4001 ||
+    code === "4001" ||
+    code === "ACTION_REJECTED" ||
+    name === "UserRejectedRequestError" ||
+    name === "UserRejectedRequestErrorType" ||
+    text.includes("user rejected") ||
+    text.includes("user denied") ||
+    text.includes("request rejected") ||
+    text.includes("action rejected")
+  );
+}
+
+function getMintErrorMessage(error, fallbackLabel = "Mint failed.") {
+  if (isWalletRejectionError(error)) {
+    return "Transaction rejected by user.";
+  }
+
+  return getErrorText(error, fallbackLabel);
+}
+
 export default function App() {
   const { address, isConnected } = useConnection();
   const chainId = useChainId();
@@ -75,6 +128,7 @@ export default function App() {
   );
   const [quantity, setQuantity] = useState(1);
   const [submittedQuantity, setSubmittedQuantity] = useState(1);
+  const [mintPanelError, setMintPanelError] = useState(null);
 
   const isOnRobinhood = chainId === TARGET_CHAIN.id;
 
@@ -207,7 +261,7 @@ export default function App() {
     (priceError ? normalizeRpcError(priceError, "Failed to read current mint price") : null) ||
     (quoteError ? normalizeRpcError(quoteError, "Failed to quote total mint price") : null) ||
     (walletMintsError ? normalizeRpcError(walletMintsError, "Failed to read wallet mint count") : null) ||
-    (mintWriteError ? normalizeRpcError(mintWriteError, "Mint write failed") : null) ||
+    mintPanelError ||
     null;
 
   const mintDisabledReason = useMemo(() => {
@@ -288,7 +342,7 @@ export default function App() {
     }
 
     if (mintWriteFailed) {
-      return normalizeRpcError(mintWriteError, "Mint write failed");
+      return getMintErrorMessage(mintWriteError, "Mint write failed");
     }
 
     if (!writeContractAsync) {
@@ -366,12 +420,17 @@ export default function App() {
       return;
     }
 
+    setMintPanelError(null);
     Promise.all([refetchSupply(), refetchPrice(), refetchWalletMints(), refetchQuote()]).then(() => {
       setStatusMessage(
         `Mint successful. ${submittedQuantity} Formula${submittedQuantity > 1 ? "s have" : " has"} been created.`,
       );
     });
   }, [txSuccess, submittedQuantity, refetchSupply, refetchPrice, refetchWalletMints, refetchQuote]);
+
+  useEffect(() => {
+    setMintPanelError(null);
+  }, [address, isConnected]);
 
   useEffect(() => {
     if (txFailed) {
@@ -425,6 +484,7 @@ export default function App() {
       return;
     }
 
+    setMintPanelError(null);
     setSubmittedQuantity(quantity);
     setStatusMessage("Confirm the transaction in your wallet...");
 
@@ -439,7 +499,9 @@ export default function App() {
       });
       setStatusMessage("Transaction submitted. Waiting for confirmation...");
     } catch (error) {
-      setStatusMessage(error?.shortMessage || error?.message || "Mint failed.");
+      const message = getMintErrorMessage(error);
+      setMintPanelError(message);
+      setStatusMessage(message);
     }
   }
 
@@ -571,9 +633,9 @@ export default function App() {
                   Reason: {mintDisabledReason}
                 </p>
               ) : null}
-              {contractErrorMessage ? (
+              {contractErrorMessage && contractErrorMessage !== statusMessage ? (
                 <p className="mt-2 break-words text-xs text-rose-300/80">
-                  Error: {contractErrorMessage}
+                  {contractErrorMessage}
                 </p>
               ) : null}
               {mintTxHash ? (
