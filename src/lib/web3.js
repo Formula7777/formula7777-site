@@ -1,8 +1,8 @@
-import { configureChains, createConfig } from "wagmi";
+import { createAppKit } from "@reown/appkit/react";
+import { WagmiAdapter } from "@reown/appkit-adapter-wagmi";
+import { QueryClient } from "@tanstack/react-query";
+import { createConfig, http, injected } from "wagmi";
 import { defineChain } from "viem";
-import { jsonRpcProvider } from "wagmi/providers/jsonRpc";
-import { publicProvider } from "wagmi/providers/public";
-import { InjectedConnector } from "wagmi/connectors/injected";
 
 export const ROBINHOOD_RPC_URL = "https://rpc.mainnet.chain.robinhood.com/";
 export const ROBINHOOD_EXPLORER_URL = "https://robinhoodchain.blockscout.com";
@@ -69,6 +69,9 @@ export const HAS_CUSTOM_ROBINHOOD_RPC_URL = Boolean(CUSTOM_ROBINHOOD_RPC_URL);
 export const DEFAULT_ROBINHOOD_RPC_URL = IS_ROBINHOOD_TESTNET
   ? ROBINHOOD_TESTNET_RPC_URL
   : ROBINHOOD_RPC_URL;
+export const REOWN_PROJECT_ID = import.meta.env.VITE_REOWN_PROJECT_ID?.trim() || "";
+export const HAS_REOWN_PROJECT_ID = Boolean(REOWN_PROJECT_ID);
+export const queryClient = new QueryClient();
 
 export const FORMULA7777_ABI = [
   {
@@ -108,40 +111,67 @@ export const FORMULA7777_ABI = [
   },
 ];
 
-const providers = [];
+const appNetworks = [TARGET_CHAIN];
+const rpcUrl = CUSTOM_ROBINHOOD_RPC_URL || DEFAULT_ROBINHOOD_RPC_URL;
+const transports = {
+  [TARGET_CHAIN.id]: http(rpcUrl),
+};
 
-if (HAS_CUSTOM_ROBINHOOD_RPC_URL) {
-  providers.push(
-    jsonRpcProvider({
-      rpc: () => ({
-        http: CUSTOM_ROBINHOOD_RPC_URL,
-      }),
-    }),
-  );
-}
+const metadata = {
+  name: "Formula7777",
+  description: "Formula7777 NFT mint",
+  url: "https://formula7777.xyz",
+  icons: ["https://formula7777.xyz/sample-formula.png"],
+};
 
-providers.push(
-  jsonRpcProvider({
-    rpc: () => ({
-      http: DEFAULT_ROBINHOOD_RPC_URL,
-    }),
-  }),
-);
+const appKitOptions = {
+  networks: appNetworks,
+  projectId: REOWN_PROJECT_ID,
+  metadata,
+  defaultNetwork: TARGET_CHAIN,
+  enableNetworkSwitch: true,
+  enableReconnect: true,
+  enableWalletGuide: false,
+  allWallets: "SHOW",
+  features: {
+    analytics: false,
+    email: false,
+    socials: [],
+    swaps: false,
+    onramp: false,
+    connectMethodsOrder: ["wallet"],
+    legalCheckbox: false,
+  },
+  themeMode: "dark",
+};
 
-providers.push(publicProvider());
+const appKitKey = "__FORMULA7777_APPKIT__";
 
-const { chains, publicClient, webSocketPublicClient } = configureChains([TARGET_CHAIN], providers);
+const wagmiAdapter = HAS_REOWN_PROJECT_ID
+  ? new WagmiAdapter({
+      networks: appNetworks,
+      projectId: REOWN_PROJECT_ID,
+      transports,
+      ssr: false,
+    })
+  : null;
 
-export const formulaConfig = createConfig({
-  autoConnect: true,
-  connectors: [
-    new InjectedConnector({
-      chains,
-      options: {
-        shimDisconnect: true,
-      },
-    }),
-  ],
-  publicClient,
-  webSocketPublicClient,
-});
+export const formulaConfig = wagmiAdapter
+  ? wagmiAdapter.wagmiConfig
+  : createConfig({
+      chains: appNetworks,
+      connectors: [
+        injected({
+          shimDisconnect: true,
+        }),
+      ],
+      transports,
+      ssr: false,
+    });
+
+export const appKitModal = HAS_REOWN_PROJECT_ID
+  ? (globalThis[appKitKey] ||= createAppKit({
+      ...appKitOptions,
+      adapters: [wagmiAdapter],
+    }))
+  : null;

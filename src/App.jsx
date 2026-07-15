@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { formatEther } from "viem";
 import {
-  useAccount,
   useBalance,
-  useContractRead,
-  useContractWrite,
-  useNetwork,
-  useSwitchNetwork,
-  useWaitForTransaction,
+  useChainId,
+  useConnection,
+  useReadContract,
+  useSwitchChain,
+  useWaitForTransactionReceipt,
+  useWriteContract,
 } from "wagmi";
 import { ConnectWalletButton } from "./components/ConnectWalletButton";
 import { CurvePreview } from "./components/CurvePreview";
@@ -65,9 +65,9 @@ function normalizeRpcError(error, fallbackLabel) {
 }
 
 export default function App() {
-  const { address, isConnected } = useAccount();
-  const { chain } = useNetwork();
-  const { switchNetwork, isLoading: switchingNetwork } = useSwitchNetwork();
+  const { address, isConnected } = useConnection();
+  const chainId = useChainId();
+  const { switchChain, isPending: switchingNetwork, error: switchNetworkError } = useSwitchChain();
   const [statusMessage, setStatusMessage] = useState(
     HAS_ROBINHOOD_DEPLOYMENT
       ? "Connected to the live Robinhood Chain contract."
@@ -76,7 +76,7 @@ export default function App() {
   const [quantity, setQuantity] = useState(1);
   const [submittedQuantity, setSubmittedQuantity] = useState(1);
 
-  const isOnRobinhood = chain?.id === TARGET_CHAIN.id;
+  const isOnRobinhood = chainId === TARGET_CHAIN.id;
 
   const {
     data: totalSupplyData,
@@ -84,13 +84,15 @@ export default function App() {
     isError: supplyReadError,
     error: supplyError,
     refetch: refetchSupply,
-  } = useContractRead({
+  } = useReadContract({
     address: FORMULA7777_CONTRACT_ADDRESS,
     abi: FORMULA7777_ABI,
     functionName: "totalSupply",
     chainId: TARGET_CHAIN.id,
-    enabled: HAS_ROBINHOOD_DEPLOYMENT,
-    watch: true,
+    query: {
+      enabled: HAS_ROBINHOOD_DEPLOYMENT,
+      refetchInterval: 12000,
+    },
   });
 
   const {
@@ -99,13 +101,15 @@ export default function App() {
     isError: priceReadError,
     error: priceError,
     refetch: refetchPrice,
-  } = useContractRead({
+  } = useReadContract({
     address: FORMULA7777_CONTRACT_ADDRESS,
     abi: FORMULA7777_ABI,
     functionName: "currentMintPrice",
     chainId: TARGET_CHAIN.id,
-    enabled: HAS_ROBINHOOD_DEPLOYMENT,
-    watch: true,
+    query: {
+      enabled: HAS_ROBINHOOD_DEPLOYMENT,
+      refetchInterval: 12000,
+    },
   });
 
   const {
@@ -114,14 +118,16 @@ export default function App() {
     isError: quoteReadError,
     error: quoteError,
     refetch: refetchQuote,
-  } = useContractRead({
+  } = useReadContract({
     address: FORMULA7777_CONTRACT_ADDRESS,
     abi: FORMULA7777_ABI,
     functionName: "quoteMintPrice",
     args: [BigInt(quantity)],
     chainId: TARGET_CHAIN.id,
-    enabled: HAS_ROBINHOOD_DEPLOYMENT && quantity >= 1 && quantity <= 7,
-    watch: true,
+    query: {
+      enabled: HAS_ROBINHOOD_DEPLOYMENT && quantity >= 1 && quantity <= 7,
+      refetchInterval: 12000,
+    },
   });
 
   const {
@@ -130,14 +136,16 @@ export default function App() {
     isError: walletMintsReadError,
     error: walletMintsError,
     refetch: refetchWalletMints,
-  } = useContractRead({
+  } = useReadContract({
     address: FORMULA7777_CONTRACT_ADDRESS,
     abi: FORMULA7777_ABI,
     functionName: "mintedByWallet",
     args: address ? [address] : undefined,
     chainId: TARGET_CHAIN.id,
-    enabled: Boolean(HAS_ROBINHOOD_DEPLOYMENT && address && isConnected && isOnRobinhood),
-    watch: true,
+    query: {
+      enabled: Boolean(HAS_ROBINHOOD_DEPLOYMENT && address && isConnected && isOnRobinhood),
+      refetchInterval: 12000,
+    },
   });
 
   const {
@@ -146,8 +154,10 @@ export default function App() {
   } = useBalance({
     address,
     chainId: TARGET_CHAIN.id,
-    enabled: Boolean(address && isConnected && isOnRobinhood),
-    watch: true,
+    query: {
+      enabled: Boolean(address && isConnected && isOnRobinhood),
+      refetchInterval: 12000,
+    },
   });
 
   const mintedSupply = clampMinted(Number(totalSupplyData ?? 0n));
@@ -166,32 +176,21 @@ export default function App() {
   );
 
   const {
-    writeAsync,
-    data: mintTx,
+    writeContractAsync,
+    data: mintTxHash,
     error: mintWriteError,
     isError: mintWriteFailed,
-    isLoading: writingMint,
-  } = useContractWrite({
-    address: FORMULA7777_CONTRACT_ADDRESS,
-    abi: FORMULA7777_ABI,
-    functionName: "mint",
-    chainId: TARGET_CHAIN.id,
-    args: [BigInt(quantity)],
-    value: bufferedMintValue,
-  });
+    isPending: writingMint,
+  } = useWriteContract();
   const {
     isLoading: txPending,
     isSuccess: txSuccess,
-  } = useWaitForTransaction({
-    hash: mintTx?.hash,
-    onSuccess: async () => {
-      await Promise.all([refetchSupply(), refetchPrice(), refetchWalletMints(), refetchQuote()]);
-      setStatusMessage(
-        `Mint successful. ${submittedQuantity} Formula${submittedQuantity > 1 ? "s have" : " has"} been created.`,
-      );
-    },
-    onError: () => {
-      setStatusMessage("Transaction failed or was dropped.");
+    isError: txFailed,
+  } = useWaitForTransactionReceipt({
+    hash: mintTxHash,
+    chainId: TARGET_CHAIN.id,
+    query: {
+      enabled: Boolean(mintTxHash),
     },
   });
 
@@ -292,7 +291,7 @@ export default function App() {
       return normalizeRpcError(mintWriteError, "Mint write failed");
     }
 
-    if (!writeAsync) {
+    if (!writeContractAsync) {
       return "Wallet provider not ready for contract write";
     }
 
@@ -322,7 +321,7 @@ export default function App() {
     quotedMintPriceData,
     maxMintable,
     quantity,
-    writeAsync,
+    writeContractAsync,
   ]);
 
   useEffect(() => {
@@ -363,6 +362,34 @@ export default function App() {
   }, [isConnected, isOnRobinhood, txPending, txSuccess, mintDisabledReason]);
 
   useEffect(() => {
+    if (!txSuccess) {
+      return;
+    }
+
+    Promise.all([refetchSupply(), refetchPrice(), refetchWalletMints(), refetchQuote()]).then(() => {
+      setStatusMessage(
+        `Mint successful. ${submittedQuantity} Formula${submittedQuantity > 1 ? "s have" : " has"} been created.`,
+      );
+    });
+  }, [txSuccess, submittedQuantity, refetchSupply, refetchPrice, refetchWalletMints, refetchQuote]);
+
+  useEffect(() => {
+    if (txFailed) {
+      setStatusMessage("Transaction failed or was dropped.");
+    }
+  }, [txFailed]);
+
+  useEffect(() => {
+    if (switchNetworkError) {
+      setStatusMessage(
+        switchNetworkError?.shortMessage ||
+          switchNetworkError?.message ||
+          "Automatic network switching is unavailable. Switch to Robinhood Chain in your wallet.",
+      );
+    }
+  }, [switchNetworkError]);
+
+  useEffect(() => {
     if (supplyError) {
       console.error("Formula7777 totalSupply read failed:", supplyError);
     }
@@ -393,7 +420,7 @@ export default function App() {
   }, [mintWriteError]);
 
   async function handleMint() {
-    if (!writeAsync) {
+    if (!writeContractAsync) {
       setStatusMessage(mintDisabledReason || "Mint unavailable");
       return;
     }
@@ -402,7 +429,14 @@ export default function App() {
     setStatusMessage("Confirm the transaction in your wallet...");
 
     try {
-      await writeAsync();
+      await writeContractAsync({
+        address: FORMULA7777_CONTRACT_ADDRESS,
+        abi: FORMULA7777_ABI,
+        functionName: "mint",
+        chainId: TARGET_CHAIN.id,
+        args: [BigInt(quantity)],
+        value: bufferedMintValue,
+      });
       setStatusMessage("Transaction submitted. Waiting for confirmation...");
     } catch (error) {
       setStatusMessage(error?.shortMessage || error?.message || "Mint failed.");
@@ -506,8 +540,15 @@ export default function App() {
                   <div className="mt-1 text-amber-200/80">Formula7777 minting targets Robinhood Chain only.</div>
                   <button
                     type="button"
-                    onClick={() => switchNetwork?.(TARGET_CHAIN.id)}
-                    disabled={!switchNetwork || switchingNetwork}
+                    onClick={() => {
+                      if (!switchChain) {
+                        setStatusMessage("Automatic network switching is unavailable. Switch to Robinhood Chain in your wallet.");
+                        return;
+                      }
+
+                      switchChain({ chainId: TARGET_CHAIN.id });
+                    }}
+                    disabled={!switchChain || switchingNetwork}
                     className="mt-3 rounded-full border border-amber-300/30 px-4 py-2 text-xs uppercase tracking-[0.22em] text-amber-100 transition hover:bg-amber-200/10 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {switchingNetwork ? "Switching..." : "Switch to Robinhood Chain"}
@@ -535,9 +576,9 @@ export default function App() {
                   Error: {contractErrorMessage}
                 </p>
               ) : null}
-              {mintTx?.hash ? (
+              {mintTxHash ? (
                 <p className="mt-2 break-all text-xs text-slate-600">
-                  Tx: {mintTx.hash}
+                  Tx: {mintTxHash}
                 </p>
               ) : null}
             </div>
