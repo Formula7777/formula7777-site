@@ -26,13 +26,13 @@ const OFFICIAL_LINKS = [
   {
     label: "X / Twitter",
     headerLabel: "Formula7777 on X",
-    shortLabel: "X",
+    iconSrc: "/x-logo.svg",
     href: "https://x.com/Formula7777x",
   },
   {
     label: "OpenSea",
     headerLabel: "Formula7777 on OpenSea",
-    shortLabel: "OS",
+    iconSrc: "/opensea-logo.svg",
     href: "https://opensea.io/collection/formula7777",
   },
   {
@@ -43,28 +43,6 @@ const OFFICIAL_LINKS = [
 ];
 
 const HEADER_LINKS = OFFICIAL_LINKS.slice(0, 2);
-
-function HeaderSocialIcon({ type }) {
-  if (type === "X") {
-    return (
-      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" className="h-4 w-4">
-        <path
-          fill="currentColor"
-          d="M18.24 2.25h3.31l-7.23 8.26 8.5 11.24h-6.66l-5.21-6.82-5.97 6.82H1.68l7.73-8.84L1.25 2.25h6.83l4.71 6.23 5.45-6.23Zm-1.16 17.52h1.83L7.08 4.13H5.12l11.96 15.64Z"
-        />
-      </svg>
-    );
-  }
-
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" className="h-[1.15rem] w-[1.15rem]">
-      <path
-        fill="currentColor"
-        d="M12 2.25a9.75 9.75 0 1 0 0 19.5 9.75 9.75 0 0 0 0-19.5Zm.12 3.1 3.28 5.44-3.28 1.36V5.35Zm-1.1.59v6.66l-4.5 1.86 4.5-8.52Zm5.88 7.36c.31.22.51.59.51 1 0 2.04-1.66 3.7-3.7 3.7H8.24a1.2 1.2 0 0 1-1.18-1.43l.04-.15 9.8-3.12Zm-1.29-1.45-3.12 1.29 1.54-2.47 1.58 1.18Z"
-      />
-    </svg>
-  );
-}
 
 function normalizeRpcError(error, fallbackLabel) {
   const message = error?.shortMessage || error?.message || "";
@@ -456,7 +434,7 @@ export default function App() {
                   title={link.label}
                   className="glow-button inline-flex h-9 w-9 items-center justify-center rounded-full border border-line bg-white/5 text-xs font-semibold uppercase text-slate-200 transition hover:border-neon/40 hover:bg-neon/10 hover:text-neon focus:outline-none focus:ring-2 focus:ring-neon/40 focus:ring-offset-2 focus:ring-offset-ink sm:h-10 sm:w-10"
                 >
-                  <HeaderSocialIcon type={link.shortLabel} />
+                  <img src={link.iconSrc} alt="" aria-hidden="true" className="h-5 w-5 object-contain" />
                 </a>
               ))}
             </nav>
