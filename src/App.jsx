@@ -22,6 +22,26 @@ import {
   TARGET_CHAIN,
 } from "./lib/web3";
 
+const OFFICIAL_LINKS = [
+  {
+    label: "X / Twitter",
+    shortLabel: "X",
+    href: "https://x.com/Formula7777x",
+  },
+  {
+    label: "OpenSea",
+    shortLabel: "OS",
+    href: "https://opensea.io/collection/formula7777",
+  },
+  {
+    label: "Contract",
+    shortLabel: "Contract",
+    href: "https://robinhoodchain.blockscout.com/address/0x1400a00F58Ab6420A497c764213d1b4F3fA934e9",
+  },
+];
+
+const HEADER_LINKS = OFFICIAL_LINKS.slice(0, 2);
+
 function normalizeRpcError(error, fallbackLabel) {
   const message = error?.shortMessage || error?.message || "";
 
@@ -398,9 +418,26 @@ export default function App() {
         <div className="ambient-scanlines" />
       </div>
       <div className="mx-auto flex min-h-screen w-full max-w-6xl flex-col overflow-x-hidden px-4 pb-12 pt-6 sm:px-6 lg:px-8">
-        <header className="reveal mb-8 flex items-center justify-between gap-3 sm:mb-10">
+        <header className="reveal mb-8 flex flex-wrap items-center justify-between gap-3 sm:mb-10">
           <div className="min-w-0 text-xs uppercase tracking-[0.22em] text-slate-300 sm:text-sm sm:tracking-[0.32em]">Formula7777</div>
-          <ConnectWalletButton />
+          <div className="ml-auto flex shrink-0 items-center gap-2">
+            <nav className="flex items-center gap-2" aria-label="Official Formula7777 links">
+              {HEADER_LINKS.map((link) => (
+                <a
+                  key={link.href}
+                  href={link.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={link.label}
+                  title={link.label}
+                  className="glow-button inline-flex h-9 w-9 items-center justify-center rounded-full border border-line bg-white/5 text-xs font-semibold uppercase text-slate-200 transition hover:border-neon/40 hover:bg-neon/10 hover:text-neon focus:outline-none focus:ring-2 focus:ring-neon/40 focus:ring-offset-2 focus:ring-offset-ink sm:h-10 sm:w-10"
+                >
+                  {link.shortLabel}
+                </a>
+              ))}
+            </nav>
+            <ConnectWalletButton />
+          </div>
         </header>
 
         <main className="grid gap-8 lg:grid-cols-[1.15fr_0.85fr]">
@@ -520,6 +557,19 @@ export default function App() {
                 <li>Each Formula is priced sequentially by the curve.</li>
                 <li>Live reads and minting target Robinhood Chain mainnet.</li>
               </ul>
+              <div className="mt-5 flex flex-wrap gap-x-4 gap-y-2 border-t border-white/6 pt-4 text-sm">
+                {OFFICIAL_LINKS.map((link) => (
+                  <a
+                    key={link.href}
+                    href={link.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-slate-300 transition hover:text-neon focus:outline-none focus:ring-2 focus:ring-neon/40 focus:ring-offset-2 focus:ring-offset-panel"
+                  >
+                    {link.label}
+                  </a>
+                ))}
+              </div>
             </div>
 
             <div className="reveal reveal-delay-3 rounded-3xl border border-line bg-panel/80 p-5 shadow-glow premium-panel">
