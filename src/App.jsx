@@ -117,13 +117,31 @@ function getMintErrorMessage(error, fallbackLabel = "Mint failed.") {
   return getErrorText(error, fallbackLabel);
 }
 
+function getContractStatusMessage(message) {
+  const normalized = String(message || "").toLowerCase();
+
+  if (normalized.includes("paused")) {
+    return "Mint is currently paused.";
+  }
+
+  if (normalized.includes("sold out")) {
+    return "Collection sold out.";
+  }
+
+  if (normalized.includes("wallet mint limit")) {
+    return "Wallet mint limit reached.";
+  }
+
+  return message;
+}
+
 export default function App() {
   const { address, isConnected } = useConnection();
   const chainId = useChainId();
   const { switchChain, isPending: switchingNetwork, error: switchNetworkError } = useSwitchChain();
   const [statusMessage, setStatusMessage] = useState(
     HAS_ROBINHOOD_DEPLOYMENT
-      ? "Connected to the live Robinhood Chain contract."
+      ? "Ready to mint on Robinhood Chain."
       : "Robinhood Chain deployment is pending.",
   );
   const [quantity, setQuantity] = useState(1);
@@ -266,7 +284,7 @@ export default function App() {
 
   const mintDisabledReason = useMemo(() => {
     if (!isConnected) {
-      return "Connect wallet first";
+      return "Connect a wallet to mint.";
     }
 
     if (!HAS_ROBINHOOD_DEPLOYMENT) {
@@ -274,7 +292,7 @@ export default function App() {
     }
 
     if (!isOnRobinhood) {
-      return "Switch to Robinhood Chain";
+      return "Switch to Robinhood Chain to mint.";
     }
 
     if (loadingSupply) {
@@ -298,27 +316,27 @@ export default function App() {
     }
 
     if (writingMint || txPending) {
-      return "Transaction pending";
+      return "Transaction submitted. Waiting for confirmation...";
     }
 
     if (mintedSupply >= SUPPLY) {
-      return "Sold out";
+      return "Collection sold out.";
     }
 
     if (supplyReadError) {
-      return normalizeRpcError(supplyError, "Failed to read total supply");
+      return getContractStatusMessage(normalizeRpcError(supplyError, "Failed to read total supply"));
     }
 
     if (priceReadError) {
-      return normalizeRpcError(priceError, "Failed to read current mint price");
+      return getContractStatusMessage(normalizeRpcError(priceError, "Failed to read current mint price"));
     }
 
     if (quoteReadError) {
-      return normalizeRpcError(quoteError, "Failed to quote total mint price");
+      return getContractStatusMessage(normalizeRpcError(quoteError, "Failed to quote total mint price"));
     }
 
     if (walletMintsReadError) {
-      return normalizeRpcError(walletMintsError, "Failed to read wallet mint count");
+      return getContractStatusMessage(normalizeRpcError(walletMintsError, "Failed to read wallet mint count"));
     }
 
     if (!quotedMintPriceData) {
@@ -326,11 +344,11 @@ export default function App() {
     }
 
     if (maxMintable === 0 && mintedByYou >= 7) {
-      return "Mint limit reached (7 / 7)";
+      return "Wallet mint limit reached.";
     }
 
     if (maxMintable === 0 && mintedSupply >= SUPPLY) {
-      return "Sold out";
+      return "Collection sold out.";
     }
 
     if (quantity < 1 || quantity > maxMintable) {
@@ -342,7 +360,7 @@ export default function App() {
     }
 
     if (mintWriteFailed) {
-      return getMintErrorMessage(mintWriteError, "Mint write failed");
+      return getContractStatusMessage(getMintErrorMessage(mintWriteError, "Mint write failed"));
     }
 
     if (!writeContractAsync) {
@@ -391,7 +409,7 @@ export default function App() {
 
   useEffect(() => {
     if (!isConnected) {
-      setStatusMessage("Connect a wallet to mint on Robinhood Chain.");
+      setStatusMessage("Connect a wallet to mint.");
       return;
     }
 
@@ -401,11 +419,11 @@ export default function App() {
     }
 
     if (!isOnRobinhood) {
-      setStatusMessage("Wrong network. Switch to Robinhood Chain to mint.");
+      setStatusMessage("Switch to Robinhood Chain to mint.");
       return;
     }
 
-    if (mintDisabledReason && mintDisabledReason !== "Transaction pending") {
+    if (mintDisabledReason && mintDisabledReason !== "Transaction submitted. Waiting for confirmation...") {
       setStatusMessage(mintDisabledReason);
       return;
     }
@@ -430,10 +448,14 @@ export default function App() {
 
   useEffect(() => {
     setMintPanelError(null);
+    if (!isConnected) {
+      setStatusMessage("Connect a wallet to mint.");
+    }
   }, [address, isConnected]);
 
   useEffect(() => {
     if (txFailed) {
+      setMintPanelError(null);
       setStatusMessage("Transaction failed or was dropped.");
     }
   }, [txFailed]);
@@ -441,9 +463,10 @@ export default function App() {
   useEffect(() => {
     if (switchNetworkError) {
       setStatusMessage(
-        switchNetworkError?.shortMessage ||
-          switchNetworkError?.message ||
+        getErrorText(
+          switchNetworkError,
           "Automatic network switching is unavailable. Switch to Robinhood Chain in your wallet.",
+        ),
       );
     }
   }, [switchNetworkError]);
@@ -486,7 +509,7 @@ export default function App() {
 
     setMintPanelError(null);
     setSubmittedQuantity(quantity);
-    setStatusMessage("Confirm the transaction in your wallet...");
+    setStatusMessage("Confirm the transaction in your wallet.");
 
     try {
       await writeContractAsync({
@@ -507,6 +530,10 @@ export default function App() {
 
   const mintDisabled =
     Boolean(mintDisabledReason);
+  const transactionInProgress = writingMint || txPending;
+  const panelStatusMessage = contractErrorMessage
+    ? getContractStatusMessage(contractErrorMessage)
+    : statusMessage;
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-transparent text-slate-100">
@@ -573,7 +600,7 @@ export default function App() {
                     id="mint-quantity"
                     value={quantity}
                     onChange={(event) => setQuantity(Number(event.target.value))}
-                    disabled={maxMintable === 0 || txPending || writingMint}
+                    disabled={maxMintable === 0 || transactionInProgress}
                     className="mt-3 w-full rounded-xl border border-white/10 bg-black/30 px-3 py-3 text-base text-white outline-none transition focus:border-neon/40 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {Array.from({ length: Math.max(maxMintable, 1) }, (_, index) => index + 1).map((value) => (
@@ -624,20 +651,10 @@ export default function App() {
                 disabled={mintDisabled}
                 className="glow-button mt-6 w-full rounded-2xl border border-neon/30 bg-neon/10 px-5 py-4 text-sm uppercase tracking-[0.26em] text-neon transition hover:bg-neon/15 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {txPending ? "Mint Pending..." : mintedSupply >= SUPPLY ? "Sold Out" : `Mint ${quantity} Formula${quantity > 1 ? "s" : ""}`}
+                {transactionInProgress ? "Waiting for Confirmation" : mintedSupply >= SUPPLY ? "Sold Out" : `Mint ${quantity} Formula${quantity > 1 ? "s" : ""}`}
               </button>
 
-              <p className="mt-3 text-sm text-slate-500">{statusMessage}</p>
-              {mintDisabledReason && !txPending && mintDisabledReason !== statusMessage ? (
-                <p className="mt-2 text-xs uppercase tracking-[0.18em] text-slate-600">
-                  Reason: {mintDisabledReason}
-                </p>
-              ) : null}
-              {contractErrorMessage && contractErrorMessage !== statusMessage ? (
-                <p className="mt-2 break-words text-xs text-rose-300/80">
-                  {contractErrorMessage}
-                </p>
-              ) : null}
+              <p className="mt-3 break-words text-sm text-slate-500">{panelStatusMessage}</p>
               {mintTxHash ? (
                 <p className="mt-2 break-all text-xs text-slate-600">
                   Tx: {mintTxHash}
